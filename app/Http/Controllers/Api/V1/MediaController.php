@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Controllers\Concerns\StoresPresignedVideo;
 use App\Http\Controllers\Controller;
 use App\Models\Post;
 use App\Models\PostMedia;
@@ -15,6 +16,8 @@ use RuntimeException;
 
 class MediaController extends Controller
 {
+    use StoresPresignedVideo;
+
     public function store(Request $request, MediaStorageService $media): JsonResponse
     {
         $this->authorize('create', Post::class);
@@ -35,6 +38,62 @@ class MediaController extends Controller
         } catch (RuntimeException $e) {
             abort(422, $e->getMessage());
         }
+
+        return response()->json([
+            'id' => $stored->id,
+            'mime' => $stored->mime,
+            'width' => $stored->width,
+            'height' => $stored->height,
+            'alt_text' => $stored->alt_text,
+        ], 201);
+    }
+
+    /**
+     * Request a video upload URL.
+     *
+     * Step 1 of the video upload: returns a short-lived (15 min) signed URL and a
+     * server-generated `key`. `PUT` the raw MP4 bytes to `url` with the returned
+     * `headers`, then register the upload with `POST /media/video`.
+     */
+    public function videoUploadUrl(Request $request): JsonResponse
+    {
+        $this->authorize('create', Post::class);
+
+        $request->validate([
+            'content_type' => ['required', 'string', 'in:video/mp4'],
+        ]);
+
+        $response = $this->signVideoUpload((string) Context::get('workspace_id'));
+
+        /** @var array{key: string, url: string, headers: array<string, string>} $payload */
+        $payload = $response->getData(true);
+
+        // On a local disk the signed URL is relative to the instance; API clients
+        // are not on the page's origin, so hand them an absolute one.
+        return response()->json([...$payload, 'url' => url($payload['url'])]);
+    }
+
+    /**
+     * Register an uploaded video.
+     *
+     * Step 2 of the video upload: confirms the object `PUT` to the signed URL,
+     * checks it is an MP4 under the size ceiling, and adds it to the media
+     * library. Returns the same shape as `POST /media`.
+     */
+    public function storeVideo(Request $request): JsonResponse
+    {
+        $this->authorize('create', Post::class);
+
+        $validated = $request->validate([
+            'key' => ['required', 'string'],
+            'duration_seconds' => ['required', 'integer', 'min:1'],
+            'width' => ['required', 'integer', 'min:1'],
+            'height' => ['required', 'integer', 'min:1'],
+            'alt_text' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $workspaceId = (string) Context::get('workspace_id');
+        $stored = $this->persistUploadedVideo($validated, $workspaceId, ['workspace_id' => $workspaceId, 'via' => 'api']);
 
         return response()->json([
             'id' => $stored->id,
