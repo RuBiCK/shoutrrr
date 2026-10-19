@@ -54,6 +54,32 @@ test('maps attached photos at original size from the media expansion, skipping v
         ->toBe(['https://pbs.twimg.com/b.jpg?name=orig', 'https://pbs.twimg.com/a.jpg?name=orig']);
 });
 
+test('maps video and animated GIF to their highest-bitrate mp4 variant', function () {
+    Http::fake(['api.twitter.com/2/users/*/tweets*' => Http::response([
+        'data' => [
+            ['id' => '100', 'text' => 'clips', 'created_at' => '2026-09-02T10:00:00.000Z', 'attachments' => ['media_keys' => ['7_v', '16_g']]],
+        ],
+        'includes' => ['media' => [
+            ['media_key' => '7_v', 'type' => 'video', 'variants' => [
+                ['content_type' => 'application/x-mpegURL', 'url' => 'https://video.twimg.com/v.m3u8'],
+                ['bit_rate' => 632000, 'content_type' => 'video/mp4', 'url' => 'https://video.twimg.com/low.mp4'],
+                ['bit_rate' => 2176000, 'content_type' => 'video/mp4', 'url' => 'https://video.twimg.com/high.mp4'],
+            ]],
+            ['media_key' => '16_g', 'type' => 'animated_gif', 'variants' => [
+                ['bit_rate' => 0, 'content_type' => 'video/mp4', 'url' => 'https://video.twimg.com/gif.mp4'],
+            ]],
+        ]],
+    ])]);
+
+    $account = ConnectedAccount::factory()->create(['platform' => Platform::X, 'remote_account_id' => '42']);
+    $result = $this->connector->fetchRecent($account, new NativeReadCursor(Date::parse('2026-09-01')->toImmutable(), null), ['access_token' => 't']);
+
+    expect(array_map(fn ($m) => [$m->url, $m->kind], $result->posts[0]->media))->toBe([
+        ['https://video.twimg.com/high.mp4', 'video'],
+        ['https://video.twimg.com/gif.mp4', 'video'],
+    ]);
+});
+
 test('strips media t.co links, expands other links and decodes entities', function () {
     Http::fake(['api.twitter.com/2/users/*/tweets*' => Http::response(['data' => [
         [

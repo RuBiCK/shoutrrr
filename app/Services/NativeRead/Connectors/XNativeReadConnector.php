@@ -37,7 +37,7 @@ class XNativeReadConnector implements NativeReadConnector
                     'start_time' => $cursor->watermark->toIso8601ZuluString(),
                     'tweet.fields' => 'created_at,attachments,entities,note_tweet,referenced_tweets,in_reply_to_user_id',
                     'expansions' => 'attachments.media_keys',
-                    'media.fields' => 'type,url',
+                    'media.fields' => 'type,url,variants',
                 ]);
         } catch (ConnectionException $e) {
             return RecentPostsResult::failed($e->getMessage());
@@ -60,12 +60,22 @@ class XNativeReadConnector implements NativeReadConnector
                 : RecentPostsResult::failed($response->body());
         }
 
-        // Only photos expose a direct `url`; video/GIF stay reference-less. The bare
-        // `url` serves a 1200px "medium" copy, so request the original upload.
-        $photoUrls = [];
+        // Photos: the bare `url` serves a 1200px "medium" copy, so request the original.
+        // Video/GIF: no `url`; take the highest-bitrate MP4 variant (HLS has no bit_rate).
+        $mediaByKey = [];
         foreach ((array) $response->json('includes.media', []) as $media) {
-            if (($media['type'] ?? null) === 'photo' && isset($media['media_key'], $media['url'])) {
-                $photoUrls[(string) $media['media_key']] = $media['url'].'?name=orig';
+            $key = (string) ($media['media_key'] ?? '');
+            $type = $media['type'] ?? null;
+            if ($type === 'photo' && isset($media['url'])) {
+                $mediaByKey[$key] = new NativeMedia($media['url'].'?name=orig', 'image');
+            } elseif (in_array($type, ['video', 'animated_gif'], true)) {
+                $mp4 = collect((array) ($media['variants'] ?? []))
+                    ->where('content_type', 'video/mp4')
+                    ->sortByDesc('bit_rate')
+                    ->first();
+                if (isset($mp4['url'])) {
+                    $mediaByKey[$key] = new NativeMedia((string) $mp4['url'], 'video', 'video/mp4');
+                }
             }
         }
 
@@ -83,10 +93,10 @@ class XNativeReadConnector implements NativeReadConnector
                 remoteId: $id,
                 text: $this->text($tweet),
                 createdAt: Carbon::parse((string) ($tweet['created_at'] ?? 'now'))->toImmutable(),
-                media: array_values(array_map(
-                    static fn (string $key): NativeMedia => new NativeMedia($photoUrls[$key], 'image'),
-                    array_filter((array) ($tweet['attachments']['media_keys'] ?? []), static fn (string $key): bool => isset($photoUrls[$key])),
-                )),
+                media: array_values(array_filter(array_map(
+                    static fn (string $key): ?NativeMedia => $mediaByKey[$key] ?? null,
+                    (array) ($tweet['attachments']['media_keys'] ?? []),
+                ))),
                 isReply: isset($tweet['in_reply_to_user_id']) || in_array('replied_to', $referenceTypes, true),
                 isRepost: in_array('retweeted', $referenceTypes, true),
             );
