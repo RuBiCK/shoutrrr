@@ -60,11 +60,12 @@ class XNativeReadConnector implements NativeReadConnector
                 : RecentPostsResult::failed($response->body());
         }
 
-        // Only photos expose a direct `url`; video/GIF stay reference-less.
+        // Only photos expose a direct `url`; video/GIF stay reference-less. The bare
+        // `url` serves a 1200px "medium" copy, so request the original upload.
         $photoUrls = [];
         foreach ((array) $response->json('includes.media', []) as $media) {
             if (($media['type'] ?? null) === 'photo' && isset($media['media_key'], $media['url'])) {
-                $photoUrls[(string) $media['media_key']] = (string) $media['url'];
+                $photoUrls[(string) $media['media_key']] = $media['url'].'?name=orig';
             }
         }
 

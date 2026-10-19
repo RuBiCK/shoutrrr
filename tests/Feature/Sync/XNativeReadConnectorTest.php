@@ -35,7 +35,7 @@ test('429 maps to rate limited', function () {
     expect($result->status)->toBe(MetricsStatus::RateLimited);
 });
 
-test('maps attached photos from the media expansion, skipping video', function () {
+test('maps attached photos at original size from the media expansion, skipping video', function () {
     Http::fake(['api.twitter.com/2/users/*/tweets*' => Http::response([
         'data' => [
             ['id' => '100', 'text' => 'pics', 'created_at' => '2026-09-02T10:00:00.000Z', 'attachments' => ['media_keys' => ['3_b', '7_v', '3_a']]],
@@ -51,7 +51,7 @@ test('maps attached photos from the media expansion, skipping video', function (
     $result = $this->connector->fetchRecent($account, new NativeReadCursor(Date::parse('2026-09-01')->toImmutable(), null), ['access_token' => 't']);
 
     expect(array_map(fn ($m) => $m->url, $result->posts[0]->media))
-        ->toBe(['https://pbs.twimg.com/b.jpg', 'https://pbs.twimg.com/a.jpg']);
+        ->toBe(['https://pbs.twimg.com/b.jpg?name=orig', 'https://pbs.twimg.com/a.jpg?name=orig']);
 });
 
 test('strips media t.co links, expands other links and decodes entities', function () {
