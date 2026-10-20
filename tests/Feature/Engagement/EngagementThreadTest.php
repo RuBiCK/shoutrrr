@@ -145,6 +145,16 @@ test('mark all read marks every unread inbound reply in the workspace', function
         ->and(PostTargetReply::withoutGlobalScopes()->find($foreign->id)->read_at)->toBeNull();
 });
 
+test('mark all read covers replies beyond the first inbox page', function (): void {
+    PostTargetReply::factory()->for($this->target, 'target')->count(30)->create([
+        'workspace_id' => $this->workspace->id,
+    ]);
+
+    $this->postJson(route('engagement.read-all'))->assertNoContent();
+
+    expect(PostTargetReply::query()->whereNull('read_at')->count())->toBe(0);
+});
+
 test('mark all read only touches replies matching the active filters', function (): void {
     $xReply = PostTargetReply::factory()->for($this->target, 'target')->create([
         'workspace_id' => $this->workspace->id,

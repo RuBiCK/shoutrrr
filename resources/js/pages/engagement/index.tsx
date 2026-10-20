@@ -895,7 +895,6 @@ export default function EngagementIndex({
                             posts={facets.posts}
                             onMarkAllRead={markAllRead}
                             markingAllRead={readAllHttp.processing}
-                            canMarkAllRead={items.some((r) => !r.is_read)}
                         />
                     </div>
                     <div className="relative min-h-0 flex-1">

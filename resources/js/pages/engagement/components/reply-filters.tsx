@@ -44,7 +44,6 @@ type Props = {
     posts: PostFacet[];
     onMarkAllRead: () => void;
     markingAllRead: boolean;
-    canMarkAllRead: boolean;
 };
 
 const PLATFORMS: { value: PlatformName; label: string }[] = [
@@ -59,7 +58,6 @@ export function ReplyFilters({
     posts,
     onMarkAllRead,
     markingAllRead,
-    canMarkAllRead,
 }: Props) {
     const [postPickerOpen, setPostPickerOpen] = useState(false);
     const activePost = posts.find((p) => p.id === filters.post);
@@ -251,7 +249,7 @@ export function ReplyFilters({
                     variant="ghost"
                     size="sm"
                     className="ml-auto h-8 gap-1.5 text-xs text-muted-foreground"
-                    disabled={!canMarkAllRead || markingAllRead}
+                    disabled={markingAllRead}
                     onClick={onMarkAllRead}
                 >
                     <CheckCheck className="size-3.5" />
