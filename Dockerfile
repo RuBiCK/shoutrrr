@@ -195,9 +195,6 @@ ENV PHP_OPCACHE_ENABLE=${PHP_OPCACHE_ENABLE} \
     HEALTHCHECK_PATH=/up \
     QUEUE_WORKER_COUNT=${QUEUE_WORKER_COUNT}
 
-# PHP security ini overrides (loads after serversideup's own conf.d files)
-COPY docker/php/zz-security-mitigations.ini /usr/local/etc/php/conf.d/zz-security-mitigations.ini
-
 # Supervisor supervises the web/worker/scheduler/ssr processes
 COPY docker/supervisord.conf /etc/supervisor/laravel.conf
 # Queue worker launcher (kept out of supervisord.conf's inline command= so
