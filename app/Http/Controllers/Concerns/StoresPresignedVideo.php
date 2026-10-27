@@ -29,6 +29,17 @@ trait StoresPresignedVideo
      */
     private function signVideoUpload(string $workspaceId): JsonResponse
     {
+        return response()->json($this->videoUploadTarget($workspaceId));
+    }
+
+    /**
+     * The sign step without the response shape, so each surface (the web
+     * composer, the public API) can render the upload target its own way.
+     *
+     * @return array{key: string, url: string, headers: array<string, string>}
+     */
+    private function videoUploadTarget(string $workspaceId): array
+    {
         $key = 'tmp/media/'.$workspaceId.'/'.Str::uuid().'.mp4';
 
         ['url' => $uploadUrl, 'headers' => $headers] = FileStorage::temporaryVideoUploadUrl(
@@ -36,11 +47,11 @@ trait StoresPresignedVideo
             now()->addMinutes(15),
         );
 
-        return response()->json([
+        return [
             'key' => $key,
             'url' => $uploadUrl,
             'headers' => $headers,
-        ]);
+        ];
     }
 
     /**

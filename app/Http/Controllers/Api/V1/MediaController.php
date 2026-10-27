@@ -39,13 +39,7 @@ class MediaController extends Controller
             abort(422, $e->getMessage());
         }
 
-        return response()->json([
-            'id' => $stored->id,
-            'mime' => $stored->mime,
-            'width' => $stored->width,
-            'height' => $stored->height,
-            'alt_text' => $stored->alt_text,
-        ], 201);
+        return $this->createdMedia($stored);
     }
 
     /**
@@ -63,14 +57,11 @@ class MediaController extends Controller
             'content_type' => ['required', 'string', 'in:video/mp4'],
         ]);
 
-        $response = $this->signVideoUpload((string) Context::get('workspace_id'));
-
-        /** @var array{key: string, url: string, headers: array<string, string>} $payload */
-        $payload = $response->getData(true);
+        $target = $this->videoUploadTarget((string) Context::get('workspace_id'));
 
         // On a local disk the signed URL is relative to the instance; API clients
         // are not on the page's origin, so hand them an absolute one.
-        return response()->json([...$payload, 'url' => url($payload['url'])]);
+        return response()->json([...$target, 'url' => url($target['url'])]);
     }
 
     /**
@@ -95,13 +86,7 @@ class MediaController extends Controller
         $workspaceId = (string) Context::get('workspace_id');
         $stored = $this->persistUploadedVideo($validated, $workspaceId, ['workspace_id' => $workspaceId, 'via' => 'api']);
 
-        return response()->json([
-            'id' => $stored->id,
-            'mime' => $stored->mime,
-            'width' => $stored->width,
-            'height' => $stored->height,
-            'alt_text' => $stored->alt_text,
-        ], 201);
+        return $this->createdMedia($stored);
     }
 
     public function destroy(string $mediaId): JsonResponse
@@ -112,5 +97,16 @@ class MediaController extends Controller
         $model->delete();
 
         return response()->json(['deleted' => true, 'id' => $mediaId]);
+    }
+
+    private function createdMedia(PostMedia $media): JsonResponse
+    {
+        return response()->json([
+            'id' => $media->id,
+            'mime' => $media->mime,
+            'width' => $media->width,
+            'height' => $media->height,
+            'alt_text' => $media->alt_text,
+        ], 201);
     }
 }

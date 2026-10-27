@@ -181,6 +181,10 @@ class PostsController extends Controller
      */
     private function ensureFormatsSupported(array $targets): void
     {
+        $accounts = ConnectedAccount::query()
+            ->whereKey(array_column($targets, 'connected_account_id'))
+            ->get()
+            ->keyBy('id');
         $errors = [];
 
         foreach ($targets as $index => $target) {
@@ -190,7 +194,7 @@ class PostsController extends Controller
                 continue;
             }
 
-            $account = ConnectedAccount::query()->find($target['connected_account_id']);
+            $account = $accounts->get($target['connected_account_id']);
 
             if (! $account instanceof ConnectedAccount) {
                 $errors["targets.{$index}.connected_account_id"] = 'No connected account with that id exists in this workspace.';

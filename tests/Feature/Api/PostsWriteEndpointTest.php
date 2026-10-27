@@ -155,3 +155,21 @@ test('rejects a format for an account outside the api key workspace', function (
         'targets' => [['connected_account_id' => $foreign->id, 'format' => 'reels']],
     ])->assertStatus(422)->assertJsonValidationErrors(['targets.0.connected_account_id']);
 });
+
+test('reports an unsupported format on the right target when several are sent', function () {
+    [, $workspace, $token] = issuedKey();
+    $instagram = ConnectedAccount::factory()->create(['workspace_id' => $workspace->id, 'platform' => Platform::Instagram->value]);
+    $x = ConnectedAccount::factory()->create(['workspace_id' => $workspace->id, 'platform' => Platform::X->value]);
+
+    $response = $this->withToken($token)->postJson('/api/v1/posts', [
+        'base_text' => 'x',
+        'destination' => ['kind' => 'all'],
+        'targets' => [
+            ['connected_account_id' => $instagram->id, 'format' => 'reels'],
+            ['connected_account_id' => $x->id, 'format' => 'reels'],
+        ],
+    ]);
+
+    $response->assertStatus(422)->assertJsonValidationErrors(['targets.1.format']);
+    expect($response->json('errors'))->not->toHaveKey('targets.0.format');
+});
